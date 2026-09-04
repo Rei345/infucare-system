@@ -1,0 +1,51 @@
+# OS & IDE
+.DS_Store
+Thumbs.db
+*.log
+logs/
+*.bak
+*.tmp
+*.swp
+.vscode/
+.idea/
+
+# Frontend (Next.js)
+**/node_modules/
+**/.pnpm-store/
+**/.next/
+**/out/
+**/build/
+**/dist/
+**/.turbo/
+*.tsbuildinfo
+next-env.d.ts
+infucare-frontend/.env*.local
+infucare-frontend/.env.development
+infucare-frontend/.env.production
+!infucare-frontend/.env.example
+
+# Backend (Golang)
+infucare-backend/.env
+infucare-backend/.env.*
+!infucare-backend/.env.example
+infucare-backend/bin/
+infucare-backend/main
+infucare-backend/*.exe
+*.exe
+*.dll
+*.so
+*.dylib
+*.workspace
+
+# Hardware / ESP32
+**/secrets.h
+**/*_secrets.h
+*.elf
+*.bin
+*.hex
+**/build/
+.pio/
+
+# Testing
+coverage/
+*.debug
