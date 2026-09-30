@@ -26,9 +26,15 @@ func (h *PatientHandler) CreatePatient(c *gin.Context) {
 		return
 	}
 
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	patient, err := h.usecase.CreatePatient(uint(unitIDFloat.(float64)), req)
+	unitID := uint(unitIDRaw.(float64))
+
+	patient, err := h.usecase.CreatePatient(unitID, req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -41,11 +47,18 @@ func (h *PatientHandler) CreatePatient(c *gin.Context) {
 }
 
 func (h *PatientHandler) GetPatients(c *gin.Context) {
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	patients, err := h.usecase.GetPatients(uint(unitIDFloat.(float64)))
+	unitID := uint(unitIDRaw.(float64))
+
+	patients, err := h.usecase.GetPatients(unitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data pasien"})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"data": patients})
@@ -60,9 +73,15 @@ func (h *PatientHandler) UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	patient, err := h.usecase.UpdatePatient(uint(unitIDFloat.(float64)), patientID, req)
+	unitID := uint(unitIDRaw.(float64))
+
+	patient, err := h.usecase.UpdatePatient(unitID, patientID, req)
 	if err != nil {
 		if err.Error() == "patient not found or access denied" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Pasien tidak ditemukan atau bukan milik unit Anda"})
@@ -81,15 +100,22 @@ func (h *PatientHandler) UpdatePatient(c *gin.Context) {
 
 func (h *PatientHandler) DeletePatient(c *gin.Context) {
 	patientID := c.Param("id")
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	if err := h.usecase.DeletePatient(uint(unitIDFloat.(float64)), patientID); err != nil {
+	unitID := uint(unitIDRaw.(float64))
+
+	if err := h.usecase.DeletePatient(unitID, patientID); err != nil {
 		if err.Error() == "patient not found or access denied" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Pasien tidak ditemukan atau bukan milik unit anda"})
 			return
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menghapus pasien, coba lagi nanti."})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
