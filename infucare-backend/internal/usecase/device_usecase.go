@@ -30,14 +30,14 @@ func (u *DeviceUsecase) Activate(unitID uint, req domain.ActivateDeviceRequest) 
 	var device domain.Device
 	err := u.db.Where("sn = ? AND secret_key = ?", req.SN, req.SecretKey).First(&device).Error
 	if err != nil {
-		return nil, errors.New("Invalid credentials")
+		return nil, errors.New("invalid credentials")
 	}
 
-	if device.UnitID != 0 {
+	if device.UnitID != nil {
 		return nil, errors.New("device already claimed")
 	}
 
-	device.UnitID = unitID
+	device.UnitID = &unitID
 	device.AliasName = req.AliasName
 	device.Status = "ONLINE"
 
@@ -108,7 +108,7 @@ func (u *DeviceUsecase) FetchUnitDevices(unitID uint) ([]domain.DeviceResponse, 
 func (u *DeviceUsecase) UpdateAndSyncSettings(unitID uint, sn string, req domain.UpdateSettingsRequest) error {
 	var device domain.Device
 	if err := u.db.Where("sn = ? AND unit_id = ?", sn, unitID).First(&device).Error; err != nil {
-		return errors.New("forbidden access")
+		return errors.New("unauthorized device access")
 	}
 
 	u.db.Model(&device).Update("alias_name", req.AliasName)
@@ -162,14 +162,12 @@ func (u *DeviceUsecase) UpdateAndSyncSettings(unitID uint, sn string, req domain
 func (u *DeviceUsecase) UnlinkDevice(unitID uint, sn string) error {
 	var device domain.Device
 	if err := u.db.Where("sn = ? AND unit_id = ?", sn, unitID).First(&device).Error; err != nil {
-		return errors.New("device not found")
+		return errors.New("unauthorized device access")
 	}
 
-	err := u.db.Model(&device).Select("UnitID", "AliasName", "Status").Updates(domain.Device{
-		UnitID:    0,
-		AliasName: "",
-		Status:    "OFFLINE",
+	return u.db.Model(&device).Updates(map[string]interface{}{
+		"unit_id": nil,
+		"alias_name": "",
+		"status": "OFFLINE",
 	}).Error
-
-	return err
 }

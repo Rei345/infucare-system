@@ -25,13 +25,15 @@ func (h *DeviceHandler) ActivateDevice(c *gin.Context) {
 		return
 	}
 
-	unitIDFloat, exists := c.Get(auth.ContextKeyUserID)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
 		return
 	}
 
-	device, err := h.usecase.Activate(uint(unitIDFloat.(float64)), req)
+	unitID := uint(unitIDRaw.(float64))
+
+	device, err := h.usecase.Activate(unitID, req)
 	if err != nil {
 		if err.Error() == "invalid credentials" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Nomor Seri atau Kunci Rahasia Alat tidak terdaftar!"})
@@ -52,9 +54,15 @@ func (h *DeviceHandler) ActivateDevice(c *gin.Context) {
 }
 
 func (h *DeviceHandler) GetDevices(c *gin.Context) {
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
-	
-	devices, err := h.usecase.FetchUnitDevices(uint(unitIDFloat.(float64)))
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	devices, err := h.usecase.FetchUnitDevices(unitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data perangkat"})
 		return
@@ -75,11 +83,17 @@ func (h *DeviceHandler) UpdateDeviceSettings(c *gin.Context) {
 		return
 	}
 
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	err := h.usecase.UpdateAndSyncSettings(uint(unitIDFloat.(float64)), sn, req)
+	unitID := uint(unitIDRaw.(float64))
+
+	err := h.usecase.UpdateAndSyncSettings(unitID, sn, req)
 	if err != nil {
-		if err.Error() == "forbidden access" {
+		if err.Error() == "unauthorized device access" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Anda tidak berhak mengubah konfigurasi alat ini"})
 			return
 		}
@@ -92,11 +106,18 @@ func (h *DeviceHandler) UpdateDeviceSettings(c *gin.Context) {
 
 func (h *DeviceHandler) UnlinkDevice(c *gin.Context) {
 	sn := c.Param("sn")
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
 
-	if err := h.usecase.UnlinkDevice(uint(unitIDFloat.(float64)), sn); err != nil {
-		if err.Error() == "device not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Perangkat tidak ditemukan di unit Anda"})
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	if err := h.usecase.UnlinkDevice(unitID, sn); err != nil {
+		if err.Error() == "unauthorized device access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Perangkat tidak ditemukan di unit Anda"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal melepaskan perangkat"})
