@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"infucare-backend/internal/usecase"
+	"infucare-backend/pkg/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,8 +21,21 @@ func NewControlHandler(uc *usecase.ControlUsecase) *ControlHandler {
 
 func (h *ControlHandler) LockActuator(c *gin.Context) {
 	deviceSN := c.Param("sn")
+	
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	if err := h.usecase.LockActuator(deviceSN); err != nil {
+	unitID := uint(unitIDRaw.(float64))
+
+	if err := h.usecase.LockActuator(unitID, deviceSN); err != nil {
+		if err.Error() == "unauthorized device access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Perangkat bukan milik unit Anda"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal memperbaharui status perangkat di database"})
 		return 
 	}
@@ -32,7 +46,20 @@ func (h *ControlHandler) LockActuator(c *gin.Context) {
 func (h *ControlHandler) UnlockActuator(c *gin.Context) {
 	deviceSN := c.Param("sn")
 
-	if err := h.usecase.UnlockActuator(deviceSN); err != nil {
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	if err := h.usecase.UnlockActuator(unitID, deviceSN); err != nil {
+		if err.Error() == "unauthorized device access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Perangkat bukan milik unit Anda"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal memperbaharui status perangkat di database"})
 		return
 	}

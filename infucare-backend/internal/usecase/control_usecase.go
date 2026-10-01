@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -23,7 +24,12 @@ func NewControlUsecase(db *gorm.DB, mqttClient mqtt.Client) *ControlUsecase {
 }
 
 // LockActuator sends a command to the servo motor to clamp the IV tube.
-func (u *ControlUsecase) LockActuator(deviceSn string) error {
+func (u *ControlUsecase) LockActuator(unitID uint, deviceSn string) error {
+	var device domain.Device
+	if err := u.db.Where("sn = ? AND unit_id = ?", deviceSn, unitID).First(&device).Error; err != nil {
+		return errors.New("unauthorized device access")
+	}
+
 	topic := fmt.Sprintf("infucare/command/%s", deviceSn)
 
 	go func() {
@@ -39,7 +45,12 @@ func (u *ControlUsecase) LockActuator(deviceSn string) error {
 }
 
 // UnlockActuator sends a command to the servo motor to release the IV tube.
-func (u *ControlUsecase) UnlockActuator(deviceSn string) error {
+func (u *ControlUsecase) UnlockActuator(unitID uint, deviceSn string) error {
+	var device domain.Device
+	if err := u.db.Where("sn = ? AND unit_id = ?", deviceSn, unitID).First(&device).Error; err != nil {
+		return errors.New("unauthorized device access")
+	}
+
 	topic := fmt.Sprintf("infucare/command/%s", deviceSn)
 
 	go func() {
