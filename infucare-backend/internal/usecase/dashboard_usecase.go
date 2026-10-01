@@ -1,10 +1,12 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"infucare-backend/internal/domain"
+
 	"gorm.io/gorm"
 )
 
@@ -106,7 +108,16 @@ func (u *DashboardUsecase) GetActiveMonitoring(unitID uint) ([]domain.ActiveMoni
 	return results, nil
 }
 
-func (u *DashboardUsecase) GetTelemetryHistory(sessionID string) ([]domain.TelemetryData, error) {
+func (u *DashboardUsecase) GetTelemetryHistory(unitID uint, sessionID string) ([]domain.TelemetryData, error) {
+	var session domain.InfusionSession
+	errCheck := u.db.Joins("JOIN patients ON patients.id = infusion_sessions.patient_id").
+		Where("infusion_sessions.id = ? AND patients.unit_id = ?", sessionID, unitID).
+		First(&session).Error
+
+	if errCheck != nil {
+		return nil, errors.New("unauthorized session access")
+	}
+
 	var history []domain.TelemetryData
 	waktuMulai := time.Now().Add(-24 * time.Hour)
 	

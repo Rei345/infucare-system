@@ -18,12 +18,13 @@ func NewDashboardHandler(uc *usecase.DashboardUsecase) *DashboardHandler {
 }
 
 func (h *DashboardHandler) GetActiveMonitoring(c *gin.Context) {
-	unitIDFloat, exists := c.Get(auth.ContextKeyUserID)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid atau kedaluwarsa"})
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
 		return
 	}
-	unitID := uint(unitIDFloat.(float64))
+
+	unitID := uint(unitIDRaw.(float64))
 
 	data, err := h.usecase.GetActiveMonitoring(unitID)
 	if err != nil {
@@ -40,8 +41,21 @@ func (h *DashboardHandler) GetActiveMonitoring(c *gin.Context) {
 func (h *DashboardHandler) GetTelemetryHistory(c *gin.Context) {
 	sessionID := c.Param("id")
 
-	data, err := h.usecase.GetTelemetryHistory(sessionID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	data, err := h.usecase.GetTelemetryHistory(unitID, sessionID)
 	if err != nil {
+		if err.Error() == "unauthorized session access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Perangkat bukan milik unit Anda"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil riwayat telemetri"})
 		return
 	}
@@ -53,12 +67,12 @@ func (h *DashboardHandler) GetTelemetryHistory(c *gin.Context) {
 }
 
 func (h *DashboardHandler) GetAnalyticsSummary(c *gin.Context) {
-	unitIDFloat, exists := c.Get(auth.ContextKeyUserID)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesi tidak valid"})
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
 		return
 	}
-	unitID := uint(unitIDFloat.(float64))
+	unitID := uint(unitIDRaw.(float64))
 
 	data, err := h.usecase.GetAnalyticsSummary(unitID)
 	if err != nil {
