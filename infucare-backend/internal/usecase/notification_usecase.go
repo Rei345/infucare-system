@@ -1,4 +1,4 @@
-package usecase 
+package usecase
 
 import (
 	"errors"
@@ -14,13 +14,13 @@ import (
 )
 
 type NotificationUsecase struct {
-	db 			*gorm.DB
-	mqttClient 	mqtt.Client
+	db         *gorm.DB
+	mqttClient mqtt.Client
 }
 
 func NewNotificationUsecase(db *gorm.DB, mqttClient mqtt.Client) *NotificationUsecase {
 	return &NotificationUsecase{
-		db: 		db, 
+		db:         db,
 		mqttClient: mqttClient,
 	}
 }
@@ -28,25 +28,29 @@ func NewNotificationUsecase(db *gorm.DB, mqttClient mqtt.Client) *NotificationUs
 func (u *NotificationUsecase) GetSettings(unitID uint) (domain.NotificationSettingsPayload, error) {
 	var configData domain.NotificationConfig
 
-	err := u.db.Where("unit_id = ?", unitID).FirstOrCreate(&configData, domain.NotificationConfig{
-		UnitID:               unitID,
-		Provider:             "WA_WAZIBAPI",
-		GlobalVolume:         50,
-		GlobalMute:           false,
-		MuteGatewayBuzzer:    false,
-		LowFluidThresholdPct: 20,
-		AutoStopThresholdPct: 10,
-		BloodSensorThreshold: 515,
-		IsActive:             true,
-		NotifyBlood:          true,
-		NotifyEmptyFluid:     true,
-		NotifyLowFluid:       true,
-		NotifyLowBattery:     true,
-		NotifyOffline:        true,
-		NotifyFailsafe:       true,
-	}).Error
-
-	if err != nil {
+	err := u.db.Where("unit_id = ?", unitID).First(&configData).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		configData = domain.NotificationConfig{
+			UnitID:               unitID,
+			Provider:             "WA_WAZIBAPI",
+			GlobalVolume:         50,
+			GlobalMute:           false,
+			MuteGatewayBuzzer:    false,
+			LowFluidThresholdPct: 15,
+			AutoStopThresholdPct: 5,
+			BloodSensorThreshold: 515,
+			IsActive:             true,
+			NotifyBlood:          true,
+			NotifyEmptyFluid:     true,
+			NotifyLowFluid:       true,
+			NotifyLowBattery:     true,
+			NotifyOffline:        true,
+			NotifyFailsafe:       true,
+		}
+		if createErr := u.db.Create(&configData).Error; createErr != nil {
+			return domain.NotificationSettingsPayload{}, createErr
+		}
+	} else if err != nil {
 		return domain.NotificationSettingsPayload{}, err
 	}
 
@@ -69,12 +73,13 @@ func (u *NotificationUsecase) GetSettings(unitID uint) (domain.NotificationSetti
 }
 
 func (u *NotificationUsecase) UpdateSettings(unitID uint, input domain.NotificationSettingsPayload) error {
-	var configData domain.NotificationConfig
-	if err := u.db.Where("unit_id = ?", unitID).FirstOrCreate(&configData, domain.NotificationConfig{UnitID: unitID}).Error; err != nil {
-		return nil
+	var count int64
+	u.db.Model(&domain.NotificationConfig{}).Where("unit_id = ?", unitID).Count(&count)
+	if count == 0 {
+		u.db.Create(&domain.NotificationConfig{UnitID: unitID})
 	}
 
-	err := u.db.Model(&configData).Updates(map[string]interface{}{
+	err := u.db.Model(&domain.NotificationConfig{}).Where("unit_id = ?", unitID).Updates(map[string]interface{}{
 		"is_active":               !input.MasterMuteWa,
 		"global_mute":             input.GlobalMuteHardware,
 		"mute_gateway_buzzer":     input.MuteGatewayBuzzer,
@@ -107,7 +112,7 @@ func (u *NotificationUsecase) UpdateSettings(unitID uint, input domain.Notificat
 		gatewayCommand = "MUTE_BUZZER"
 	}
 
-	go func ()  {
+	go func() {
 		if u.mqttClient != nil && u.mqttClient.IsConnected() {
 			u.mqttClient.Publish("infucare/gateway/control", 1, false, gatewayCommand)
 
@@ -139,7 +144,7 @@ func (u *NotificationUsecase) TestWhatsApp(unitID uint) error {
 	}
 
 	if configData.TargetID == "" {
-		return errors.New("empty number")
+		return errors.New("empty_number")
 	}
 
 	pesan := "🤖 *InfuCare System - TEST*\n\n" +

@@ -19,9 +19,15 @@ func NewNotificationHandler(uc *usecase.NotificationUsecase) *NotificationHandle
 }
 
 func (h *NotificationHandler) GetSettings(c *gin.Context) {
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID) 
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	settings, err := h.usecase.GetSettings(uint(unitIDFloat.(float64)))
+	unitID := uint(unitIDRaw.(float64))
+
+	settings, err := h.usecase.GetSettings(unitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil pengaturan unit"})
 		return
@@ -37,9 +43,15 @@ func (h *NotificationHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	if err := h.usecase.UpdateSettings(uint(unitIDFloat.(float64)), req); err != nil {
+	unitID := uint(unitIDRaw.(float64))
+
+	if err := h.usecase.UpdateSettings(unitID, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan ke Database"})
 		return
 	}
@@ -48,9 +60,15 @@ func (h *NotificationHandler) UpdateSettings(c *gin.Context) {
 }
 
 func (h *NotificationHandler) TestWhatsApp(c *gin.Context) {
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	err := h.usecase.TestWhatsApp(uint(unitIDFloat.(float64)))
+	unitID := uint(unitIDRaw.(float64))
+
+	err := h.usecase.TestWhatsApp(unitID)
 	if err != nil {
 		if err.Error() == "config not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Pengaturan tidak ditemukan"})
