@@ -27,6 +27,11 @@ func (h *TelemetryHandler) ReceiveTelemetryFromGateway(c *gin.Context) {
 
 	command, err := h.usecase.ProcessHTTPFallback(req)
 	if err != nil {
+		if err.Error() == "active session not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Sesi pemantauan tidak aktif atau tidak ditemukan"})
+			return
+		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan telemetri"})
 		return
 	}
