@@ -28,9 +28,9 @@ func (u *TrackingUsecase) GetGlobalHistoryLogs(unitID uint) ([]domain.HistoryLog
 				a.event_type, 
 				a.description
 			FROM activity_logs a
-			LEFT JOIN infusion_sessions s ON a.session_id = s.id
-			LEFT JOIN patients p ON s.patient_id = p.id
-			WHERE p.unit_id = ? OR p.unit_id IS NULL
+			JOIN infusion_sessions s ON a.session_id = s.id
+			JOIN patients p ON s.patient_id = p.id
+			WHERE p.unit_id = ?
 			ORDER BY a.created_at DESC
 	`
 
@@ -145,29 +145,36 @@ func (u *TrackingUsecase) GetPatientTracking(patientID string, unitID uint) (dom
 		}
 
 		var lastTelemetry domain.TelemetryData
-		u.db.Where("session_id = ?", activeSession.ID).Order("created_at desc").First(&lastTelemetry)
+		errTelemetry := u.db.Where("session_id = ?", activeSession.ID).Order("created_at desc").First(&lastTelemetry).Error
 
-		offsetKosong := activeSession.Device.DeviceSetting.LoadcellOffset
-		if offsetKosong == 0 {
-			offsetKosong = 145.0
-		}
-		
-		sisaCairan := lastTelemetry.WeightGram - offsetKosong
-		if sisaCairan < 0 {
-			sisaCairan = 0
-		}
-		if sisaCairan > 500 {
-			sisaCairan = 500
+		var sisaCairan float64
+		var persentaseSisa int
+		isPaused := false
+
+		if errTelemetry != nil || lastTelemetry.ID == 0 {
+			sisaCairan = 500.0
+			persentaseSisa = 100
+			statusPasien = "NORMAL"
+		} else {
+			sisaCairan = lastTelemetry.WeightGram
+			if sisaCairan < 0 {
+				sisaCairan = 0
+			}
+			if sisaCairan > 500 {
+				sisaCairan = 500
+			}
+
+			persentaseSisa = int((sisaCairan / 500.0) * 100)
+			isPaused = (lastTelemetry.Tpm == 0)
+
+			if lastTelemetry.BloodRawValue >= bloodSensorThreshold || persentaseSisa <= AutoStopThresholdPct {
+				statusPasien = "CRITICAL"
+			} else if persentaseSisa <= lowFluidThreshold {
+				statusPasien = "WARNING"
+			}
 		}
 
 		totalML := ((float64(botolDigunakan) - 1) * 500.0) + (500.0 - sisaCairan)
-		persentaseSisa := int((sisaCairan / 500.0) * 100)
-
-		if lastTelemetry.BloodRawValue >= bloodSensorThreshold || persentaseSisa <= AutoStopThresholdPct {
-			statusPasien = "CRITICAL"
-		} else if persentaseSisa <= lowFluidThreshold {
-			statusPasien = "WARNING"
-		}
 		
 		CurrentSessionData = &domain.CurrentSessionData{
 			ID: activeSession.ID,
@@ -176,7 +183,7 @@ func (u *TrackingUsecase) GetPatientTracking(patientID string, unitID uint) (dom
 			Duration: durasiStr,
 			TotalMl: int(totalML),
 			BottlesUsed: botolDigunakan,
-			IsPaused: lastTelemetry.Tpm == 0,
+			IsPaused: isPaused,
 			FluidPct: persentaseSisa,
 			Events: u.formatLogstoEvents(activeLogs),
 		}
@@ -251,7 +258,7 @@ func (u *TrackingUsecase) formatLogstoEvents(logs []domain.ActivityLog) []domain
 		events = append(events, domain.EventDetail{
 			ID: l.ID,
 			Type: l.EventType,
-			Timestamp: l.CreatedAt.Format("02 Jan 2026 15:04:05"),
+			Timestamp: l.CreatedAt.Format("02 Jan 2006 15:04:05"),
 			TimeOnly: l.CreatedAt.Format("15:04:05"),
 			Description: desc,
 		})

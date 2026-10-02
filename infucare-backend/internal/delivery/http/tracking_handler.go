@@ -18,9 +18,15 @@ func NewTrackingHandler(uc *usecase.TrackingUsecase) *TrackingHandler {
 }
 
 func (h *TrackingHandler) GetGlobalHistoryLogs(c *gin.Context) {
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	results, err := h.usecase.GetGlobalHistoryLogs(uint(unitIDFloat.(float64)))
+	unitID := uint(unitIDRaw.(float64))
+
+	results, err := h.usecase.GetGlobalHistoryLogs(unitID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil riwayat global"})
 		return
@@ -34,9 +40,16 @@ func (h *TrackingHandler) GetGlobalHistoryLogs(c *gin.Context) {
 
 func (h *TrackingHandler) GetPatientTracking(c *gin.Context) {
 	patientID := c.Param("id")
-	unitIDFloat, _ := c.Get(auth.ContextKeyUserID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
 
-	response, err := h.usecase.GetPatientTracking(patientID, uint(unitIDFloat.(float64)))
+	unitID := uint(unitIDRaw.(float64))
+
+	response, err := h.usecase.GetPatientTracking(patientID, unitID)
 	if err != nil {
 		if err.Error() == "patient not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Pasien tidak ditemukan atau bukan milik unit Anda"})
