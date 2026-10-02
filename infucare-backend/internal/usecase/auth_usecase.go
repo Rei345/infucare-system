@@ -39,6 +39,7 @@ func (u *AuthUsecase) Login(req domain.LoginRequest) (domain.LoginResponse, erro
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id":  user.ID,
+		"unit_id":  user.UnitID,
 		"username": user.Username,
 		"role":     user.Role,
 		"exp":      time.Now().Add(time.Hour * 24).Unix(),
@@ -53,6 +54,7 @@ func (u *AuthUsecase) Login(req domain.LoginRequest) (domain.LoginResponse, erro
 		Token: tokenString,
 		User: domain.UserResponse{
 			ID:       user.ID,
+			UnitID:   user.UnitID,
 			Name:     user.Name,
 			Username: user.Username,
 			Role:     user.Role,

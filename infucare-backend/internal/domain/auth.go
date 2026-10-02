@@ -15,6 +15,7 @@ type LoginResponse struct {
 // UserResponse sefely exposes user details without leaking sensitive data like passowrds.
 type UserResponse struct {
 	ID 			uint 	`json:"id"`
+	UnitID		uint	`json:"unit_id"`
 	Name 		string 	`json:"name"`
 	Username	string 	`json:"username"`
 	Role 		string 	`json:"role"`

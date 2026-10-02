@@ -12,6 +12,7 @@ import (
 
 const (
 	ContextKeyUserID   = "user_id"
+	ContextKeyUnitID   = "unit_id"
 	ContextKeyUsername = "username"
 	ContextKeyRole     = "role"
 )
@@ -53,6 +54,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			c.Set(ContextKeyUserID, claims["user_id"])
+			c.Set(ContextKeyUnitID, claims["unit_id"])
 			c.Set(ContextKeyUsername, claims["username"])
 			c.Set(ContextKeyRole, claims["role"])
 		}
