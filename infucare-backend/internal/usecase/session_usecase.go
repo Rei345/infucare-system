@@ -23,14 +23,19 @@ func NewSessionUsecase(db *gorm.DB, mqttClient mqtt.Client) *SessionUsecase {
 	}
 }
 
-func (u *SessionUsecase) StartSession(req domain.StartSessionRequest) (*domain.InfusionSession, error) {
+func (u *SessionUsecase) StartSession(unitID uint, req domain.StartSessionRequest) (*domain.InfusionSession, error) {
+	var patient domain.Patient
+	if err := u.db.Where("id = ? AND unit_id = ?", req.PatientID, unitID).First(&patient).Error; err != nil {
+		return nil, errors.New("patient not found in unit")
+	}
+	
 	var existingSession domain.InfusionSession
 	if err := u.db.Where("device_sn = ? AND end_at IS NULL", req.DeviceSN).First(&existingSession).Error; err == nil {
 		return nil, errors.New("device is currently in use")
 	}
 
 	var device domain.Device
-	if err := u.db.Where("sn = ?", req.DeviceSN).First(&device).Error; err != nil {
+	if err := u.db.Where("sn = ? AND unit_id = ?", req.DeviceSN, unitID).First(&device).Error; err != nil {
 		return nil, errors.New("device not found")
 	}
 
@@ -87,11 +92,18 @@ func (u *SessionUsecase) StartSession(req domain.StartSessionRequest) (*domain.I
 	return &newSession, nil
 }
 
-func (u *SessionUsecase) TareSession(SessionID string) (*domain.InfusionSession, error) {
+func (u *SessionUsecase) TareSession(unitID uint, sessionID string) (*domain.InfusionSession, error) {
 	var session domain.InfusionSession
+	errCheck := u.db.Joins("JOIN patients ON patients.id = infusion_sessions.patient_id").
+		Where("infusion_sessions.id = ? AND patients.unit_id = ?", sessionID, unitID).
+		First(&session).Error
+
+	if errCheck != nil {
+		return nil, errors.New("unauthorized session access")
+	}
 
 	err := u.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.First(&session, SessionID).Error; err != nil {
+		if err := tx.First(&session, sessionID).Error; err != nil {
 			return errors.New("session not found")
 		}
 
@@ -130,8 +142,16 @@ func (u *SessionUsecase) TareSession(SessionID string) (*domain.InfusionSession,
 	return &session, nil
 }
 
-func (u *SessionUsecase) UpdateTpm(sessionID string, targetTPM int) error {
+func (u *SessionUsecase) UpdateTpm(unitID uint, sessionID string, targetTPM int) error {
 	var session domain.InfusionSession
+	errCheck := u.db.Joins("JOIN patients ON patients.id = infusion_sessions.patient_id").
+		Where("infusion_sessions.id = ? AND patients.unit_id = ?", sessionID, unitID).
+		First(&session).Error
+
+	if errCheck != nil {
+		return errors.New("unauthorized session access")
+	}
+
 	if err := u.db.Where("id = ? AND end_at IS NULL", sessionID).First(&session).Error; err != nil {
 		return errors.New("active session not found")
 	}
@@ -168,9 +188,17 @@ func (u *SessionUsecase) UpdateTpm(sessionID string, targetTPM int) error {
 	return nil
 }
 
-func (u *SessionUsecase) EndSession(SessionID string) error {
+func (u *SessionUsecase) EndSession(unitID uint, sessionID string) error {
 	var session domain.InfusionSession
-	if err := u.db.Where("id = ? AND end_at IS NULL", SessionID).First(&session).Error; err != nil {
+	errCheck := u.db.Joins("JOIN patients ON patients.id = infusion_sessions.patient_id").
+			Where("infusion_sessions.id = ? AND patients.unit_id = ?", sessionID, unitID).
+			First(&session).Error
+	
+	if errCheck != nil {
+		return errors.New("unauthorized session access")
+	}
+
+	if err := u.db.Where("id = ? AND end_at IS NULL", sessionID).First(&session).Error; err != nil {
 		return errors.New("active session not found")
 	}
 

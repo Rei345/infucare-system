@@ -5,6 +5,7 @@ import (
 
 	"infucare-backend/internal/domain"
 	"infucare-backend/internal/usecase"
+	"infucare-backend/pkg/auth"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,10 +25,23 @@ func (h *SessionHandler) StartSession(c *gin.Context) {
 		return
 	}
 
-	session, err := h.usecase.StartSession(req)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	session, err := h.usecase.StartSession(unitID, req)
 	if err != nil {
+		if err.Error() == "patient not found in unit" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Pasien bukan milik unit Anda"})
+			return
+		}
+
 		if err.Error() == "device is currently in use" {
-			c.JSON(http.StatusConflict, gin.H{"error": "Perangkat ini sedang digunakan pada aktif lain!"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Perangkat ini sedang digunakan pada pasien lain!"})
 			return
 		}
 
@@ -54,8 +68,21 @@ func (h *SessionHandler) StartSession(c *gin.Context) {
 func (h *SessionHandler) TareSession(c *gin.Context) {
 	sessionID := c.Param("id")
 
-	session, err := h.usecase.TareSession(sessionID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	session, err := h.usecase.TareSession(unitID, sessionID)
 	if err != nil {
+		if err.Error() == "unauthorized session access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Sesi bukan milik unit Anda"})
+			return
+		}
+
 		if err.Error() == "session not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Sesi tidak ditemukan"})
 			return
@@ -85,8 +112,21 @@ func (h *SessionHandler) UpdateSessionTpm(c *gin.Context) {
 		return
 	}
 
-	err := h.usecase.UpdateTpm(sessionID, req.TargetTpm)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	err := h.usecase.UpdateTpm(unitID, sessionID, req.TargetTpm)
 	if err != nil {
+		if err.Error() == "unauthorized session access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Sesi bukan milik unit Anda"})
+			return
+		}
+
 		if err.Error() == "active session not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Sesi aktif tidak ditemukan"})
 			return
@@ -105,8 +145,21 @@ func (h *SessionHandler) UpdateSessionTpm(c *gin.Context) {
 func (h *SessionHandler) EndSession(c *gin.Context) {
 	sessionID := c.Param("id")
 
-	err := h.usecase.EndSession(sessionID)
+	unitIDRaw, exists := c.Get(auth.ContextKeyUnitID)
+	if !exists || unitIDRaw == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Identitas instansi (Unit ID) tidak valid dalam sesi"})
+		return
+	}
+
+	unitID := uint(unitIDRaw.(float64))
+
+	err := h.usecase.EndSession(unitID, sessionID)
 	if err != nil {
+		if err.Error() == "unauthorized session access" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Akses ditolak: Sesi bukan milik unit Anda"})
+			return
+		}
+
 		if err.Error() == "active session not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Sesi aktif tidak ditemukan"})
 			return
