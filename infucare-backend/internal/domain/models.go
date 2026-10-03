@@ -23,7 +23,7 @@ type User struct {
 	HealthUnit HealthUnit `gorm:"foreignKey:UnitID" json:"health_unit,omitempty"`
 	Name       string     `gorm:"type:varchar(255);not null" json:"name"`
 	Username   string     `gorm:"type:varchar(100);unique;not null" json:"username"`
-	Password   string     `gorm:"type:varchar(255);not null" json:"-"` // SECURITY: Hidden from JSON response
+	Password   string     `gorm:"type:varchar(255);not null" json:"-"`
 	Role       string     `gorm:"type:varchar(50);not null" json:"role"`
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`
@@ -45,9 +45,9 @@ type Patient struct {
 // Device represents the ESP32 hardware endpoint.
 type Device struct {
 	SN               string            `gorm:"primaryKey;type:varchar(100)" json:"sn"`
-	UnitID           uint              `gorm:"not null" json:"unit_id"`
-	HealthUnit       HealthUnit        `gorm:"foreignKey:UnitID" json:"health_unit,omitempty"`
-	SecretKey        string            `gorm:"type:varchar(255)" json:"-"` // SECURITY: Hidden from JSON response
+	UnitID           *uint             `gorm:"index" json:"unit_id"`
+	HealthUnit       *HealthUnit       `gorm:"foreignKey:UnitID" json:"health_unit,omitempty"`
+	SecretKey        string            `gorm:"type:varchar(255)" json:"-"` 
 	AliasName        string            `gorm:"type:varchar(255)" json:"alias_name"`
 	Status           string            `gorm:"type:varchar(50)" json:"status"`
 	DeviceSetting    DeviceSetting     `gorm:"foreignKey:DeviceSN;references:SN" json:"device_setting,omitempty"`
@@ -97,7 +97,7 @@ type InfusionSession struct {
 // TelemetryData stores timeseries data from the hardware.
 type TelemetryData struct {
 	ID            uint64    `gorm:"primaryKey" json:"id"`
-	SessionID     uint      `gorm:"index;not null" json:"session_id"` // PERFORMANCE: Indexed for timeseries querying
+	SessionID     uint      `gorm:"index;not null" json:"session_id"` 
 	WeightGram    float64   `json:"weight_gram"`
 	Tpm           int       `json:"tpm"`
 	BloodRawValue int       `json:"blood_raw_value"`
@@ -105,7 +105,7 @@ type TelemetryData struct {
 	SignalDbm     int       `json:"signal_dbm"`
 	InternalTemp  float64   `json:"internal_temp"`
 	UptimeSeconds int       `json:"uptime_seconds"`
-	CreatedAt     time.Time `gorm:"index" json:"created_at"` // PERFORMANCE: Indexed for sorting
+	CreatedAt     time.Time `gorm:"index" json:"created_at"` 
 }
 
 // ActivityLog records system events for audit trails.
