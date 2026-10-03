@@ -36,7 +36,12 @@ func (h *PatientHandler) CreatePatient(c *gin.Context) {
 
 	patient, err := h.usecase.CreatePatient(unitID, req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		if err.Error() == "registration_no already exists" {
+			c.JSON(http.StatusConflict, gin.H{"error": "NIK sudah terdaftar di sistem"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mendaftarkan pasien ke sistem"})
 		return
 	}
 

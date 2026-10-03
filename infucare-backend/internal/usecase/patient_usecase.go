@@ -16,6 +16,12 @@ func NewPatientUsecase(db *gorm.DB) *PatientUsecase {
 
 // CreatePatient registers a new patient to a specific health unit.
 func (u *PatientUsecase) CreatePatient(UnitID uint, req domain.PatientRequest) (*domain.Patient, error) {
+	var count int64
+	u.db.Model(&domain.Patient{}).Where("registration_no = ?", req.RegistrationNo).Count(&count)
+	if count > 0 {
+		return nil, errors.New("registration_no already exists")
+	}
+
 	newPatient := domain.Patient{
 		UnitID: UnitID,
 		Name: req.Name,
@@ -24,7 +30,7 @@ func (u *PatientUsecase) CreatePatient(UnitID uint, req domain.PatientRequest) (
 	}
 
 	if err := u.db.Create(&newPatient).Error; err != nil {
-		return nil, errors.New("failed to create patient, ensure RegistrationNo is unique")
+		return nil, err
 	}
 
 	return &newPatient, nil
@@ -68,7 +74,7 @@ func (u *PatientUsecase) DeletePatient(unitID uint, patientID string) error {
 
 	return u.db.Transaction(func (tx *gorm.DB) error {
 		var sessionIDs []uint
-		tx.Model(&domain.InfusionSession{}).Where("patien_id = ?", patient.ID).Pluck("id", &sessionIDs)
+		tx.Model(&domain.InfusionSession{}).Where("patient_id = ?", patient.ID).Pluck("id", &sessionIDs)
 
 		if len(sessionIDs) > 0 {
 			if err := tx.Where("session_id IN ?", sessionIDs).Delete(&domain.TelemetryData{}).Error; err != nil {
