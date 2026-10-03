@@ -1,6 +1,7 @@
 package httpdelivery
 
 import (
+	"log"
 	"net/http"
 
 	"infucare-backend/internal/domain"
@@ -80,7 +81,9 @@ func (h *NotificationHandler) TestWhatsApp(c *gin.Context) {
 			return
 		}
 
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal kirim WA: " + err.Error()})
+		log.Printf("[WHATSAPP GATEWAY ERROR] Gagal mengirim pesan uji coba unit %d: %v\n", unitID, err)
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengirim pesan uji coba melalui WhatsApp Gateway"})
 		return
 	}
 
