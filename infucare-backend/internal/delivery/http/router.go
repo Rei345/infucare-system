@@ -4,9 +4,11 @@ import (
 	"time"
 
 	"infucare-backend/pkg/auth"
+	"infucare-backend/pkg/ratelimit"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 )
 
 func SetupRouter(
@@ -24,21 +26,27 @@ func SetupRouter(
 ) *gin.Engine {
 	r := gin.Default()
 
+	r.SetTrustedProxies(nil)
+
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: 		[]string{"http://localhost:3000"},
 		AllowMethods: 		[]string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders: 		[]string{"Origin,", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders: 		[]string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders: 		[]string{"Content-Length"},
 		AllowCredentials: 	true,
 		MaxAge: 			12 * time.Hour,
 	}))
 
+	loginLimiter := ratelimit.NewIPLimiter(rate.Every(12*time.Second), 5)
+	apiLimiter := ratelimit.NewIPLimiter(rate.Limit(10), 20)
+
 	api := r.Group("/api/v1")
+	api.Use(apiLimiter.Middleware())
 	{
 		// 1. RUTE PUBLIK
 		authGroup := api.Group("/auth")
 		{
-			authGroup.POST("/login", authH.Login)
+			authGroup.POST("/login", loginLimiter.Middleware(), authH.Login)
 		}
 
 		// 2. RUTE PRIVAT
@@ -73,7 +81,7 @@ func SetupRouter(
 			// Settings & Notifications
 			protected.GET("/settings", notificationH.GetSettings)
 			protected.PUT("/settings", notificationH.UpdateSettings)
-			protected.POST("/settings/test-wa", notificationH.TestWhatsApp)
+			protected.POST("/settings/test-wa", loginLimiter.Middleware(), notificationH.TestWhatsApp)
 
 			// Patients
 			protected.POST("/patients", patientH.CreatePatient)
