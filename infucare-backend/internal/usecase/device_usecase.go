@@ -15,10 +15,10 @@ import (
 type DeviceUsecase struct {
 	db 			*gorm.DB
 	mqttClient 	mqtt.Client
-	deviceCache map[string]domain.DeviceCacheItem
+	deviceCache *DeviceCache
 }
 
-func NewDeviceUsecase(db *gorm.DB, mqttClient mqtt.Client, cache map[string]domain.DeviceCacheItem) *DeviceUsecase {
+func NewDeviceUsecase(db *gorm.DB, mqttClient mqtt.Client, cache *DeviceCache) *DeviceUsecase {
 	return &DeviceUsecase{
 		db: 			db,
 		mqttClient: 	mqttClient,
@@ -63,7 +63,7 @@ func (u *DeviceUsecase) FetchUnitDevices(unitID uint) ([]domain.DeviceResponse, 
 			DeviceSetting: 	d.DeviceSetting,
 		}
 
-		cacheItem, isCached := u.deviceCache[d.SN]
+		cacheItem, isCached := u.deviceCache.Get(d.SN)
 
 		if isCached && time.Since(cacheItem.LastSeen) < 30*time.Second {
 			res.Status = "ONLINE"

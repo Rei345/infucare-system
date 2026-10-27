@@ -53,7 +53,7 @@ func main() {
 	}
 
 	// 5. Inisialisasi Shared Memori Cache
-	deviceCache := make(map[string]domain.DeviceCacheItem)
+	deviceCache := usecase.NewDeviceCache()
 
 	// 6. Inisialisasi MQTT Client (Paho)
 	mqttOpts := paho.NewClientOptions()

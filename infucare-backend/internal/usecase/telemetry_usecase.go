@@ -18,10 +18,10 @@ import (
 type TelemetryUsecase struct {
 	db          *gorm.DB
 	mqttClient  mqtt.Client
-	deviceCache map[string]domain.DeviceCacheItem
+	deviceCache *DeviceCache
 }
 
-func NewTelemetryUsecase(db *gorm.DB, mqttClient mqtt.Client, cache map[string]domain.DeviceCacheItem) *TelemetryUsecase {
+func NewTelemetryUsecase(db *gorm.DB, mqttClient mqtt.Client, cache *DeviceCache) *TelemetryUsecase {
 	return &TelemetryUsecase{
 		db:          db,
 		mqttClient:  mqttClient,
@@ -68,9 +68,9 @@ func (u *TelemetryUsecase) ProcessEmergency(deviceSN string, status string) {
 		
 		u.db.Model(&domain.Device{}).Where("sn = ?", deviceSN).Update("status", "CRITICAL")
 		
-		if cache, ok := u.deviceCache[deviceSN]; ok {
+		if cache, ok := u.deviceCache.Get(deviceSN); ok {
 			cache.Payload.BloodRawValue = 999 
-			u.deviceCache[deviceSN] = cache
+			u.deviceCache.Set(deviceSN, cache)
 		}
 
 		if notifConfig.IsActive && notifConfig.NotifyBlood && notifConfig.TargetID != "" {
@@ -99,7 +99,7 @@ func (u *TelemetryUsecase) ProcessEmergency(deviceSN string, status string) {
 }
 
 func (u *TelemetryUsecase) ProcessTelemetry(payload domain.TelemetryPayload) {
-	cacheItem, exists := u.deviceCache[payload.DeviceSN]
+	cacheItem, exists := u.deviceCache.Get(payload.DeviceSN)
 	lastSavedTime := time.Time{}
 	lastSavedTPM := 0
 	
@@ -108,12 +108,12 @@ func (u *TelemetryUsecase) ProcessTelemetry(payload domain.TelemetryPayload) {
 		lastSavedTPM = cacheItem.LastSavedTPM
 	}
 
-	u.deviceCache[payload.DeviceSN] = domain.DeviceCacheItem{
+	u.deviceCache.Set(payload.DeviceSN, domain.DeviceCacheItem{
 		Payload:       payload,
 		LastSeen:      time.Now(),
 		LastSavedTime: lastSavedTime, 
 		LastSavedTPM:  lastSavedTPM, 
-	}
+	}) 
 	
 	u.db.Model(&domain.Device{}).Where("sn = ?", payload.DeviceSN).Update("status", "ONLINE")
 
@@ -252,12 +252,12 @@ func (u *TelemetryUsecase) ProcessTelemetry(payload domain.TelemetryPayload) {
 		}
 
 		if err := u.db.Create(&telemetry).Error; err == nil {
-			u.deviceCache[payload.DeviceSN] = domain.DeviceCacheItem{
+			u.deviceCache.Set(payload.DeviceSN, domain.DeviceCacheItem{
 				Payload:       payload,
 				LastSeen:      time.Now(),
 				LastSavedTime: time.Now(),    
 				LastSavedTPM:  payload.Tpm,    
-			}
+			})
 		}
 	}
 }
