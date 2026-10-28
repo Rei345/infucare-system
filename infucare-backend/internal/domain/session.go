@@ -5,11 +5,11 @@ type StartSessionRequest struct {
 	PatientID 	uint 	`json:"patient_id" binding:"required"`
 	DeviceSN 	string 	`json:"device_sn" binding:"required"`
 	FluidID 	uint 	`json:"fluid_id" binding:"required"`
-	TargetTpm 	int 	`json:"target_tpm" binding:"required"`
-	BottleCount int 	`json:"bottle_count" binding:"required"`
+	TargetTpm 	int 	`json:"target_tpm" binding:"required,gte=5,lte=120"`
+	BottleCount int 	`json:"bottle_count" binding:"required,gte=1,lte=20"`
 }
 
 // UpdateTpmRequest defines the input to change drip rate mid-session.
 type UpdateTpmRequest struct {
-	TargetTpm int `json:"target_tpm" binding:"required"`
+	TargetTpm int `json:"target_tpm" binding:"required,gte=5,lte=120"`
 }

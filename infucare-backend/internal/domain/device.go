@@ -8,7 +8,7 @@ type ActivateDeviceRequest struct {
 
 type UpdateSettingsRequest struct {
 	AliasName		string 	`json:"alias_name"`
-	SpeakerVolume 	int 	`json:"speaker_volume"`
+	SpeakerVolume 	int 	`json:"speaker_volume" binding:"gte=0,lte=100"`
 	AutoStopBlood 	bool 	`json:"auto_stop_blood"`
 	AutoStopEmpty 	bool 	`json:"auto_stop_empty"`
 }
