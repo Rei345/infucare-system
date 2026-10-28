@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"strings"
 
 	"infucare-backend/internal/domain"
 
@@ -56,6 +57,9 @@ func (u *SessionUsecase) StartSession(unitID uint, req domain.StartSessionReques
 
 	err := u.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&newSession).Error; err != nil {
+			if strings.Contains(err.Error(), "ux_active_session_per_device") || strings.Contains(err.Error(), "duplicate key") {
+				return errors.New("device is currently in use")
+			}
 			return err
 		}
 
@@ -103,17 +107,24 @@ func (u *SessionUsecase) TareSession(unitID uint, sessionID string) (*domain.Inf
 	}
 
 	err := u.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.First(&session, sessionID).Error; err != nil {
-			return errors.New("session not found")
+		res := tx.Model(&domain.InfusionSession{}).
+				Where("id = ? AND end_at IS NULL", sessionID).
+				Update("bottle_count", gorm.Expr("bottle_count + 1"))
+
+		if res.Error != nil {
+			return res.Error
 		}
 
-		if session.EndAt != nil {
+		if res.RowsAffected == 0 {
+			var check domain.InfusionSession
+			if err := tx.Where("id = ?", sessionID).First(&check).Error; err != nil {
+				return errors.New("session not found")
+			}
 			return errors.New("session already ended")
 		}
 
-		session.BottleCount += 1
-		if err := tx.Save(&session).Error; err != nil {
-			return err
+		if err := tx.Where("id = ?", sessionID).First(&session).Error; err != nil {
+			return errors.New("session not found")
 		}
 
 		logEntry := domain.ActivityLog{
@@ -198,23 +209,26 @@ func (u *SessionUsecase) EndSession(unitID uint, sessionID string) error {
 		return errors.New("unauthorized session access")
 	}
 
-	if err := u.db.Where("id = ? AND end_at IS NULL", sessionID).First(&session).Error; err != nil {
-		return errors.New("active session not found")
-	}
-
 	now := time.Now()
-	session.EndAt = &now
 
 	err := u.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(&session).Error; err != nil {
-			return err
+		res := tx.Model(&domain.InfusionSession{}).
+				Where("id = ? AND end_at IS NULL", sessionID).
+				Update("end_at", now)
+
+		if res.Error != nil {
+			return res.Error
+		}
+
+		if res.RowsAffected == 0 {
+			return errors.New("active session not found")
 		}
 
 		logEntry := domain.ActivityLog{
 			SessionID: session.ID,
 			EventType: "SESSION_END",
 			Description: "Sesi pemantauan infus telah diakhiri secara manual oleh petugas.",
-			CreatedAt: time.Now(),
+			CreatedAt: now,
 		}
 		return tx.Create(&logEntry).Error
 	})

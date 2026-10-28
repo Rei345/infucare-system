@@ -47,6 +47,11 @@ func main() {
 		log.Fatal("Gagal melakukan migrasi tabel:", err)
 	}
 
+	err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_active_session_per_device ON infusion_sessions (device_sn) WHERE end_at IS NULL`).Error
+	if err != nil {
+		log.Fatal("Gagal membuat unique index sesi aktif:", err)
+	}
+
 	// 4. Jalankan Seeder
 	if err := config.SeedDatabase(db); err != nil {
 		log.Fatal("Gagal menjalankan seeder default: ", err)

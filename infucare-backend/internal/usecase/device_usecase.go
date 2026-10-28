@@ -27,23 +27,28 @@ func NewDeviceUsecase(db *gorm.DB, mqttClient mqtt.Client, cache *DeviceCache) *
 }
 
 func (u *DeviceUsecase) Activate(unitID uint, req domain.ActivateDeviceRequest) (*domain.Device, error) {
-	var device domain.Device
-	err := u.db.Where("sn = ? AND secret_key = ?", req.SN, req.SecretKey).First(&device).Error
-	if err != nil {
-		return nil, errors.New("invalid credentials")
-	}
+	res := u.db.Model(&domain.Device{}).
+			Where("sn = ? AND secret_key = ? AND unit_id IS NULL", req.SN, req.SecretKey).
+			Updates(map[string]interface{}{
+				"unit_id": unitID,
+				"alias_name": req.AliasName,
+				"status": "ONLINE",
+			})
 
-	if device.UnitID != nil {
-		return nil, errors.New("device already claimed")
-	}
-
-	device.UnitID = &unitID
-	device.AliasName = req.AliasName
-	device.Status = "ONLINE"
-
-	if err := u.db.Save(&device).Error; err != nil {
+	if res.Error != nil {
 		return nil, errors.New("failed to save device")
 	}
+
+	if res.RowsAffected == 0 {
+		var existing domain.Device
+		if err := u.db.Where("sn = ? AND secret_key = ?", req.SN, req.SecretKey).First(&existing).Error; err != nil {
+			return nil, errors.New("invalid credentials")
+		}
+		return nil, errors.New("device already claimed")
+	}
+	
+	var device domain.Device
+	u.db.Where("sn = ?", req.SN).First(&device)
 
 	return &device, nil
 }
