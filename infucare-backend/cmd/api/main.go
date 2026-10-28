@@ -60,22 +60,29 @@ func main() {
 	// 5. Inisialisasi Shared Memori Cache
 	deviceCache := usecase.NewDeviceCache()
 
+	var telemetryUC *usecase.TelemetryUsecase
+
 	// 6. Inisialisasi MQTT Client (Paho)
 	mqttOpts := paho.NewClientOptions()
 	mqttOpts.AddBroker(fmt.Sprintf("tcp://%s:%s", os.Getenv("MQTT_BROKER"), os.Getenv("MQTT_PORT")))
 	mqttOpts.SetClientID(fmt.Sprintf("infucare_backend_%d", time.Now().Unix()))
 	mqttOpts.SetUsername(os.Getenv("MQTT_USER"))
 	mqttOpts.SetPassword(os.Getenv("MQTT_PASSWORD"))
-	mqttOpts.OnConnectionLost = func (c paho.Client, err error)  {
+	mqttOpts.SetAutoReconnect(true)
+	mqttOpts.OnConnectionLost = func(c paho.Client, err error) {
 		log.Printf("[MQTT] Koneksi terputus: %v", err)
+	}
+	mqttOpts.OnConnect = func(c paho.Client) {
+		mqttHandler := mqttdelivery.NewMQTTHandler(telemetryUC)
+		topic := os.Getenv("MQTT_TOPIC")
+		emergencyTopic := "infucare/emergency/+"
+
+		c.Subscribe(topic, 1, mqttHandler.MessagePubHandler)
+		c.Subscribe(emergencyTopic, 1, mqttHandler.EmergencyPubHandler)
+		log.Printf("[MQTT] Terhubung & berlangganan topik: %s", topic)
 	}
 
 	mqttClient := paho.NewClient(mqttOpts)
-	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
-		log.Println("[MQTT] Peringatan: Gagal terhubung ke Broker saat startup: ", token.Error())
-	} else {
-		log.Println("[MQTT] Berhasil terhubung ke Broker IoT")
-	}
 
 	// 7. Inisialisasi Usecase
 	authUC := usecase.NewAuthUsecase(db)
@@ -84,22 +91,16 @@ func main() {
 	fluidUC := usecase.NewFluidUsecase(db)
 	patientUC := usecase.NewPatientUsecase(db)
 	trackingUC := usecase.NewTrackingUsecase(db)
-	telemetryUC := usecase.NewTelemetryUsecase(db, mqttClient, deviceCache)
+	telemetryUC = usecase.NewTelemetryUsecase(db, mqttClient, deviceCache)
 	deviceUC := usecase.NewDeviceUsecase(db, mqttClient, deviceCache)
 	controlUC := usecase.NewControlUsecase(db, mqttClient)
 	notificationUC := usecase.NewNotificationUsecase(db, mqttClient)
 	sessionUC := usecase.NewSessionUsecase(db, mqttClient)
 
-	// 8. Inisialisasi MQTT Delivery
-	mqttHandler := mqttdelivery.NewMQTTHandler(telemetryUC)
-	if mqttClient.IsConnected() {
-		topic := os.Getenv("MQTT_TOPIC")
-		emergencyTopic := "infucare/emergency/+"
-
-		mqttClient.Subscribe(topic, 1, mqttHandler.MessagePubHandler)
-		mqttClient.Subscribe(emergencyTopic, 1, mqttHandler.EmergencyPubHandler)
-		log.Printf("[MQTT] Mendengarkan topik: %s", topic)
-	}
+	// 8. Jalankan Koneksi MQTT setelah telemetryUC siap
+	if token := mqttClient.Connect(); token.Wait() && token.Error() != nil {
+		log.Println("[MQTT] Peringatan: Gagal terhubung ke Broker saat startup: ", token.Error())
+	} 
 
 	// 9. Aktifkan cron job/perbersih log lama
 	telemetryUC.StartDataCleanerCron()
