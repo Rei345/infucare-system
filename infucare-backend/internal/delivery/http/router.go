@@ -96,7 +96,7 @@ func SetupRouter(
 			protected.PUT("/sessions/:id/tpm", sessionH.UpdateSessionTpm)
 
 			// Telemetry
-			protected.POST("/telemetry", telemetryH.ReceiveTelemetryFromGateway)
+			// protected.POST("/telemetry", telemetryH.ReceiveTelemetryFromGateway)
 
 			// Log Activity
 			protected.GET("/history", trackingH.GetGlobalHistoryLogs)
