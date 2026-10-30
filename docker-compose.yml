@@ -1,0 +1,50 @@
+services:
+  # 1. Container Database PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: infucare-postgres
+    restart: unless-stopped
+    env_file: 
+      - ./infucare-backend/.env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password_infucare_123
+      POSTGRES_DB: infucare_db
+      TZ: Asia/Jakarta
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Container Backend Golang
+  backend:
+    build:
+      context: ./infucare-backend
+      dockerfile: Dockerfile
+    container_name: infucare-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./infucare-backend/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: password_infucare_123
+      DB_NAME: infucare_db
+      DB_SSLMODE: disable
+      MQTT_BROKER: host.docker.internal
+
+volumes:
+  pgdata:
