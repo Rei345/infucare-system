@@ -1,0 +1,60 @@
+name: Backend GO CI
+
+on:
+  push:
+    branches: [ "main", "feat/**" ]
+    paths:
+      - "infucare-backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "infucare-backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  test-and-build:
+    name: Vet, Unit Test (Race), & Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./infucare-backend
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "infucare-backend/go.mod"
+          cache-dependency-path: "infucare-backend/go.sum"
+
+      - name: Download & Verify Dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Run Go Vet
+        run: go vet ./...
+
+      - name: Run Unit Tests with Race Detector
+        run: go test -v -race ./...
+
+      - name: Test Build Binary
+        run: go build -v -o infucare-server ./cmd/api/main.go
+
+  docker-build-check:
+    name: Verify Dockerfile Build
+    runs-on: ubuntu-latest
+    needs: test-and-build
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Build Backend Docker Image
+        run: docker build -t infucare-backend:ci-test ./infucare-backend
