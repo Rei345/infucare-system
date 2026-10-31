@@ -15,6 +15,7 @@ on:
       - ".github/workflows/ci.yml"
 
 jobs:
+  # JOB 1: CONTINUOUS INTEGRATION (Testing)
   test-and-build:
     name: Vet, Unit Test (Race), & Build
     runs-on: ubuntu-latest
@@ -44,9 +45,17 @@ jobs:
       - name: Run Unit Tests with Race Detector
         run: go test -v -race ./...
 
-      - name: Test Build Binary
-        run: go build -v -o infucare-server ./cmd/api/main.go
+      - name: Build Production Binary (Linux AMD64)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o infucare-api ./cmd/api/main.go
 
+      - name: Upload Compiled Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: infucare-api-binary
+          path: infucare-backend/infucare-api
+          retention-days: 1
+
+  # JOB 2: DOCKER BUILD VERIFICATION
   docker-build-check:
     name: Verify Dockerfile Build
     runs-on: ubuntu-latest
@@ -58,3 +67,42 @@ jobs:
 
       - name: Build Backend Docker Image
         run: docker build -t infucare-backend:ci-test ./infucare-backend
+
+  # JOB 3: CONTINUOUS DEPLOYMENT (Otomatis ke VPS)
+  deploy-production:
+    name: Deploy Binary to Rumahweb VPS
+    runs-on: ubuntu-latest
+    needs: [test-and-build, docker-build-check]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download Compiled Binary Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: infucare-api-binary
+
+      - name: Copy Binary to VPS via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          source: "infucare-api"
+          target: "/tmp"
+          overwrite: true
+
+      - name: Restart InfuCare Systemd Service via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            chmod +x /tmp/infucare-api
+            mv /tmp/infucare-api /var/www/infucare/backend/infucare-api
+            rm -f /var/www/infucare/backend/.env.save
+            systemctl restart infucare.service
+            sleep 2
+            systemctl is-active --quiet infucare.service && echo "✅ Deploy Sukses: infucare.service berjalan normal!"
