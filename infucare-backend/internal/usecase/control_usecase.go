@@ -64,27 +64,3 @@ func (u *ControlUsecase) UnlockActuator(unitID uint, deviceSn string) error {
 
 	return u.db.Model(&domain.Device{}).Where("sn = ?", deviceSn).Update("status", "ONLINE").Error
 }
-
-// MuteGateway silences the buzzer on the main central gateway.
-func (u *ControlUsecase) MuteGateway() error {
-	topic := "infucare/gateway/control"
-	if u.mqttClient == nil || !u.mqttClient.IsConnected() {
-		return fmt.Errorf("MQTT broker is disconnected")
-	}
-
-	token := u.mqttClient.Publish(topic, 1, false, "MUTE_BUZZER")
-	token.Wait()
-	return token.Error()
-}
-
-// UnmuteGateway reactivates the buzzer on the main central gateway.
-func (u *ControlUsecase) UnmuteGateway() error {
-	topic := "infucare/gateway/control"
-	if u.mqttClient == nil || !u.mqttClient.IsConnected() {
-		return fmt.Errorf("MQTT broker is disconnected")
-	}
-
-	token := u.mqttClient.Publish(topic, 1, false, "UNMUTE_BUZZER")
-	token.Wait()
-	return token.Error()
-}

@@ -29,7 +29,7 @@ func SetupRouter(
 	r.SetTrustedProxies(nil)
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: 		[]string{"http://localhost:3000"},
+		AllowOrigins: 		[]string{"http://localhost:3000", "https://infucare.id", "https://www.infucare.id"},
 		AllowMethods: 		[]string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders: 		[]string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders: 		[]string{"Content-Length"},
@@ -60,7 +60,7 @@ func SetupRouter(
 
 			// Health Unit
 			protected.GET("/health-units", healthUnitH.GetHealthUnits)
-			protected.POST("/health-units", healthUnitH.CreateHealthUnit)
+			// protected.POST("/health-units", healthUnitH.CreateHealthUnit)
 
 			// Device Management
 			protected.POST("/devices", deviceH.ActivateDevice)
@@ -69,14 +69,12 @@ func SetupRouter(
 			protected.PUT("/devices/:sn/settings", deviceH.UpdateDeviceSettings)
 
 			// Fluid Profiles
-			protected.POST("/fluids", fluidH.CreateFluidProfile)
+			// protected.POST("/fluids", fluidH.CreateFluidProfile)
 			protected.GET("/fluids", fluidH.GetFluidProfiles)
 
 			// Hardware Remote Control 
-			protected.POST("/control/device/:sn/lock", controlH.LockActuator)
+			// protected.POST("/control/device/:sn/lock", controlH.LockActuator)
 			protected.POST("/control/device/:sn/unlock", controlH.UnlockActuator)
-			protected.POST("/control/gateway/mute", controlH.MuteGatewayBuzzer)
-			protected.POST("/control/gateway/unmute", controlH.UnmuteGatewayBuzzer)
 
 			// Settings & Notifications
 			protected.GET("/settings", notificationH.GetSettings)

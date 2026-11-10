@@ -66,21 +66,3 @@ func (h *ControlHandler) UnlockActuator(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Perintah Pembukaan aktuator dikirim ke %s", deviceSN)})
 }
-
-func (h *ControlHandler) MuteGatewayBuzzer(c *gin.Context) {
-	if err := h.usecase.MuteGateway(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membungkam buzzer gateway"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Perintah mute berhasil dikirim ke gateway"})
-}
-
-func (h *ControlHandler) UnmuteGatewayBuzzer(c *gin.Context) {
-	if err := h.usecase.UnmuteGateway(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal mengaktifkan kembali buzzer gateway"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Perintah unmute berhasil dikirim ke gateway"})
-}
